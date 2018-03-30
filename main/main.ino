@@ -10,8 +10,8 @@ enum ALERT_DIRECTIONS {
 };
 //constants
 
-int irPulse;
-int remoteCode;
+int lastSig = -1;
+bool locked = false;
 
 void setup() {
     Serial.begin(9600);
@@ -49,8 +49,20 @@ void setup() {
 }
 
 void loop() {
-    int remoteCode = GetIrCode();
+    Serial.println("locked | lastSig");
+    Serial.print(bool(locked));
+    Serial.print(" | ");
+    Serial.println(lastSig);
 
+    int remoteCode = GetIrCode();
+    if (locked && lastSig != -1 && remoteCode != ZERO) {
+        lock_func();
+    } else {
+        handleSig(remoteCode);
+    }
+}
+
+void handleSig(int remoteCode) {
     if (remoteCode == -1) {
         /* Timeout/no signal */
         if ((servoLeft.attached()==true) && (servoRight.attached()==true)) {
@@ -59,6 +71,8 @@ void loop() {
             servoRight.detach();
         }
     } else {
+        Serial.print("Handling sig: ");
+        Serial.println(remoteCode);
         if ((servoLeft.attached() == false) && (servoRight.attached() == false)) {
             /* need to be attached, do plz be :D */
             servoLeft.attach(ServoLeftPin);
@@ -109,55 +123,49 @@ void loop() {
         case ONE:
         case VOL_DOWN: //left turn
             move(-200, 0);
+            lastSig = remoteCode;
             break;
         case THREE:
         case VOL_UP: //right turn
             move(0, -200);
+            lastSig = remoteCode;
             break;
         case TWO:
         case CHAN_UP: //forwards
             move(-200, -200);
+            lastSig = remoteCode;
             break;
         case FOUR: // left pivot
             move(-200, 200);
+            lastSig = remoteCode;
             break;
         case FIVE: //do nothing
             move(0, 0, -1);
+            lastSig = remoteCode;
             break;
         case SIX: // right pivot
             move(200, -200);
+            lastSig = remoteCode;
             break;
         case SEVEN: //back left turn
             move(0, -200);
+            lastSig = remoteCode;
             break;
         case NINE: //back right turn
             move(-200, 0);
+            lastSig = remoteCode;
             break;
         case EIGHT:
         case CHAN_DOWN: //backwards
             move(200, 200);
+            lastSig = remoteCode;
             break;
         case MUTE: //test speaker and lights
             alert_all();
+            lastSig = remoteCode;
             break;
-        case ZERO: //debugger
-            /* TODO: make this a lock? */
-            Serial.println("irl | irr | irb | remoteCode || distanceR | distanceL");
-
-            Serial.print(irl);
-            Serial.print(" | ");
-            Serial.print(irr);
-            Serial.print(" | ");
-            Serial.print(irb);
-            Serial.print(" | ");
-            Serial.print(remoteCode);
-            Serial.print(" || ");
-            Serial.print(distanceR);
-            Serial.print(" | ");
-            Serial.print(distanceL);
-            Serial.print(" | ");
-            Serial.println(distanceB);
-            alert_all();
+        case ZERO: //lock last action
+            toggle_lock();
             break;
         case -1: //nohting
             break;
@@ -310,4 +318,14 @@ int irDistance(int irLedPin, int irReceivePin) {
         /* thoretical maximum = |(FREQUENCY - 42000) / 1000| (rounded) */
     }
     return distance;
+}
+
+void lock_func() {
+    Serial.println("lock_func called");
+    handleSig(lastSig);
+}
+
+void toggle_lock() {
+    Serial.println("Toggling lock");
+    locked = !locked;
 }
